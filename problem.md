@@ -7,7 +7,7 @@ Build a **Rust-based HTTP server** exposing **Solana-related endpoints**. The se
 ## HTTP-URL
 
 ```
-https://your-url
+https://superdev-fellowship.vercel.app/api
 ```
 
 ## Response Format
