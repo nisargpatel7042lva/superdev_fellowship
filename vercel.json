@@ -1,0 +1,25 @@
+{
+  "functions": {
+    "api/keypair.rs": {
+      "runtime": "vercel-rust@4.0.9"
+    },
+    "api/message/sign.rs": {
+      "runtime": "vercel-rust@4.0.9"
+    },
+    "api/message/verify.rs": {
+      "runtime": "vercel-rust@4.0.9"
+    },
+    "api/send/sol.rs": {
+      "runtime": "vercel-rust@4.0.9"
+    },
+    "api/send/token.rs": {
+      "runtime": "vercel-rust@4.0.9"
+    },
+    "api/token/create.rs": {
+      "runtime": "vercel-rust@4.0.9"
+    },
+    "api/token/mint.rs": {
+      "runtime": "vercel-rust@4.0.9"
+    }
+  }
+}

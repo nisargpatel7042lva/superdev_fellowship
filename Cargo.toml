@@ -1,0 +1,37 @@
+[package]
+name = "superdev-fellowship"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+serde_json = { version = "1.0.140" }
+tokio = { version = "1.45.1", features = ["full"] }
+vercel_runtime = "1.1.6"
+
+[[bin]]
+name = "superdev-fellowship-message-sign"
+path = "api/message/sign.rs"
+
+[[bin]]
+name = "superdev-fellowship-message-verify"
+path = "api/message/verify.rs"
+
+[[bin]]
+name = "superdev-fellowship-send-sol"
+path = "api/send/sol.rs"
+
+[[bin]]
+name = "superdev-fellowship-send-token"
+path = "api/send/token.rs"
+
+[[bin]]
+name = "superdev-fellowship-token-create"
+path = "api/token/create.rs"
+
+[[bin]]
+name = "superdev-fellowship-token-mint"
+path = "api/token/mint.rs"
+
+[[bin]]
+name = "superdev-fellowship-keypair"
+path = "api/keypair.rs"
