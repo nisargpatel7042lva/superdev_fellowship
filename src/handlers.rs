@@ -13,6 +13,8 @@ use std::str::FromStr;
 use base64::{Engine as _, engine::general_purpose};
 use bs58;
 use std::convert::TryFrom;
+use serde::Serialize;
+use serde_json;
 
 use crate::models::*;
 
@@ -128,7 +130,7 @@ pub async fn sign_message_with_private_key(
         return Ok(JsonResponse(ApiResponse {
             success: false,
             data: None,
-            error: Some("Message and secret key are required for signing".to_string()),
+            error: Some("Missing required fields".to_string()),
         }));
     }
 
