@@ -17,17 +17,21 @@ pub struct KeypairResponse {
 
 #[derive(Deserialize)]
 pub struct CreateTokenRequest {
+    #[serde(rename = "mintAuthority")]
     pub mint_authority: String,
     pub mint: String,
     pub decimals: u8,
 }
 
 #[derive(Serialize)]
-pub struct InstructionResponse {
+pub struct InstructionResponse<T> {
     pub program_id: String,
-    pub accounts: Vec<AccountMetaResponse>,
+    pub accounts: T,
     pub instruction_data: String,
 }
+
+pub type SolInstructionResponse = InstructionResponse<Vec<String>>;
+pub type TokenInstructionResponse = InstructionResponse<Vec<AccountMetaResponse>>;
 
 #[derive(Serialize)]
 pub struct AccountMetaResponse {

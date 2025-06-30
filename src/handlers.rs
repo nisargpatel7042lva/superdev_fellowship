@@ -16,7 +16,10 @@ use std::convert::TryFrom;
 use serde::Serialize;
 use serde_json;
 
-use crate::models::*;
+use crate::models::{
+    ApiResponse, KeypairResponse, CreateTokenRequest, TokenInstructionResponse, SolInstructionResponse,
+    AccountMetaResponse, MintTokenRequest, SignMessageRequest, SignMessageResponse, VerifyMessageRequest, VerifyMessageResponse, SendSolRequest, SendTokenRequest
+};
 
 pub async fn check_server_health() -> JsonResponse<ApiResponse<String>> {
     JsonResponse(ApiResponse {
@@ -40,14 +43,18 @@ pub async fn create_new_keypair() -> JsonResponse<ApiResponse<KeypairResponse>> 
 
 pub async fn create_token_mint_instruction(
     Json(payload): Json<CreateTokenRequest>,
-) -> Result<JsonResponse<ApiResponse<InstructionResponse>>, StatusCode> {
+) -> Result<JsonResponse<ApiResponse<TokenInstructionResponse>>, StatusCode> {
     let mint_authority = Pubkey::from_str(&payload.mint_authority)
         .map_err(|_| StatusCode::BAD_REQUEST)?;
     let mint = Pubkey::from_str(&payload.mint)
         .map_err(|_| StatusCode::BAD_REQUEST)?;
 
     if payload.decimals > 9 {
-        return Err(StatusCode::BAD_REQUEST);
+        return Ok(JsonResponse(ApiResponse {
+            success: false,
+            data: None,
+            error: Some("Decimals must be between 0 and 9".to_string()),
+        }));
     }
 
     let instruction = token_instruction::initialize_mint(
@@ -58,7 +65,7 @@ pub async fn create_token_mint_instruction(
         payload.decimals,
     ).map_err(|_| StatusCode::BAD_REQUEST)?;
 
-    let accounts = instruction
+    let accounts: Vec<AccountMetaResponse> = instruction
         .accounts
         .iter()
         .map(|acc| AccountMetaResponse {
@@ -70,7 +77,7 @@ pub async fn create_token_mint_instruction(
 
     Ok(JsonResponse(ApiResponse {
         success: true,
-        data: Some(InstructionResponse {
+        data: Some(TokenInstructionResponse {
             program_id: instruction.program_id.to_string(),
             accounts,
             instruction_data: general_purpose::STANDARD.encode(&instruction.data),
@@ -81,7 +88,7 @@ pub async fn create_token_mint_instruction(
 
 pub async fn create_mint_token_instruction(
     Json(payload): Json<MintTokenRequest>,
-) -> Result<JsonResponse<ApiResponse<InstructionResponse>>, StatusCode> {
+) -> Result<JsonResponse<ApiResponse<TokenInstructionResponse>>, StatusCode> {
     let mint = Pubkey::from_str(&payload.mint)
         .map_err(|_| StatusCode::BAD_REQUEST)?;
     let destination = Pubkey::from_str(&payload.destination)
@@ -90,7 +97,11 @@ pub async fn create_mint_token_instruction(
         .map_err(|_| StatusCode::BAD_REQUEST)?;
 
     if payload.amount == 0 {
-        return Err(StatusCode::BAD_REQUEST);
+        return Ok(JsonResponse(ApiResponse {
+            success: false,
+            data: None,
+            error: Some("Amount must be greater than zero".to_string()),
+        }));
     }
 
     let instruction = token_instruction::mint_to(
@@ -102,7 +113,7 @@ pub async fn create_mint_token_instruction(
         payload.amount,
     ).map_err(|_| StatusCode::BAD_REQUEST)?;
 
-    let accounts = instruction
+    let accounts: Vec<AccountMetaResponse> = instruction
         .accounts
         .iter()
         .map(|acc| AccountMetaResponse {
@@ -114,7 +125,7 @@ pub async fn create_mint_token_instruction(
 
     Ok(JsonResponse(ApiResponse {
         success: true,
-        data: Some(InstructionResponse {
+        data: Some(TokenInstructionResponse {
             program_id: instruction.program_id.to_string(),
             accounts,
             instruction_data: general_purpose::STANDARD.encode(&instruction.data),
@@ -126,7 +137,7 @@ pub async fn create_mint_token_instruction(
 pub async fn sign_message_with_private_key(
     Json(payload): Json<SignMessageRequest>,
 ) -> Result<JsonResponse<ApiResponse<SignMessageResponse>>, StatusCode> {
-    if payload.message.is_empty() || payload.secret.is_empty() {
+    if payload.message.trim().is_empty() || payload.secret.trim().is_empty() {
         return Ok(JsonResponse(ApiResponse {
             success: false,
             data: None,
@@ -139,7 +150,11 @@ pub async fn sign_message_with_private_key(
         .map_err(|_| StatusCode::BAD_REQUEST)?;
 
     if secret_bytes.len() != 64 {
-        return Err(StatusCode::BAD_REQUEST);
+        return Ok(JsonResponse(ApiResponse {
+            success: false,
+            data: None,
+            error: Some("Invalid secret key length".to_string()),
+        }));
     }
 
     let keypair = Keypair::from_bytes(&secret_bytes)
@@ -170,7 +185,11 @@ pub async fn verify_signed_message(
         .map_err(|_| StatusCode::BAD_REQUEST)?;
 
     if signature_bytes.len() != 64 {
-        return Err(StatusCode::BAD_REQUEST);
+        return Ok(JsonResponse(ApiResponse {
+            success: false,
+            data: None,
+            error: Some("Invalid signature length".to_string()),
+        }));
     }
 
     let signature = solana_sdk::signature::Signature::try_from(signature_bytes.as_slice())
@@ -191,31 +210,31 @@ pub async fn verify_signed_message(
 
 pub async fn create_sol_transfer_instruction(
     Json(payload): Json<SendSolRequest>,
-) -> Result<JsonResponse<ApiResponse<InstructionResponse>>, StatusCode> {
+) -> Result<JsonResponse<ApiResponse<SolInstructionResponse>>, StatusCode> {
     let from = Pubkey::from_str(&payload.from)
         .map_err(|_| StatusCode::BAD_REQUEST)?;
     let to = Pubkey::from_str(&payload.to)
         .map_err(|_| StatusCode::BAD_REQUEST)?;
 
     if payload.lamports == 0 {
-        return Err(StatusCode::BAD_REQUEST);
+        return Ok(JsonResponse(ApiResponse {
+            success: false,
+            data: None,
+            error: Some("Lamports must be greater than zero".to_string()),
+        }));
     }
 
     let instruction = system_instruction::transfer(&from, &to, payload.lamports);
 
-    let accounts = instruction
+    let accounts: Vec<String> = instruction
         .accounts
         .iter()
-        .map(|acc| AccountMetaResponse {
-            pubkey: acc.pubkey.to_string(),
-            is_signer: acc.is_signer,
-            is_writable: acc.is_writable,
-        })
+        .map(|acc| acc.pubkey.to_string())
         .collect();
 
     Ok(JsonResponse(ApiResponse {
         success: true,
-        data: Some(InstructionResponse {
+        data: Some(SolInstructionResponse {
             program_id: instruction.program_id.to_string(),
             accounts,
             instruction_data: general_purpose::STANDARD.encode(&instruction.data),
@@ -226,7 +245,7 @@ pub async fn create_sol_transfer_instruction(
 
 pub async fn create_token_transfer_instruction(
     Json(payload): Json<SendTokenRequest>,
-) -> Result<JsonResponse<ApiResponse<InstructionResponse>>, StatusCode> {
+) -> Result<JsonResponse<ApiResponse<TokenInstructionResponse>>, StatusCode> {
     let destination = Pubkey::from_str(&payload.destination)
         .map_err(|_| StatusCode::BAD_REQUEST)?;
     let mint = Pubkey::from_str(&payload.mint)
@@ -235,7 +254,11 @@ pub async fn create_token_transfer_instruction(
         .map_err(|_| StatusCode::BAD_REQUEST)?;
 
     if payload.amount == 0 {
-        return Err(StatusCode::BAD_REQUEST);
+        return Ok(JsonResponse(ApiResponse {
+            success: false,
+            data: None,
+            error: Some("Amount must be greater than zero".to_string()),
+        }));
     }
 
     let source = spl_associated_token_account::get_associated_token_address(&owner, &mint);
@@ -249,7 +272,7 @@ pub async fn create_token_transfer_instruction(
         payload.amount,
     ).map_err(|_| StatusCode::BAD_REQUEST)?;
 
-    let accounts = instruction
+    let accounts: Vec<AccountMetaResponse> = instruction
         .accounts
         .iter()
         .map(|acc| AccountMetaResponse {
@@ -261,7 +284,7 @@ pub async fn create_token_transfer_instruction(
 
     Ok(JsonResponse(ApiResponse {
         success: true,
-        data: Some(InstructionResponse {
+        data: Some(TokenInstructionResponse {
             program_id: instruction.program_id.to_string(),
             accounts,
             instruction_data: general_purpose::STANDARD.encode(&instruction.data),
