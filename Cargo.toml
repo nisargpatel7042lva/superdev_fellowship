@@ -1,45 +1,22 @@
 [package]
 name = "superdev-fellowship"
 version = "0.1.0"
-edition = "2024"
+edition = "2021"
 
 [dependencies]
-base58 = "0.2.0"
-base64 = "0.22.1"
-ed25519-dalek = "2.1.1"
-rand = "0.9.1"
-serde = { version = "1.0.219", features = ["derive"] }
-serde_json = { version = "1.0.140" }
-solana-sdk = "2.3.1"
-spl-associated-token-account = "7.0.0"
-spl-token = "8.0.0"
-tokio = { version = "1.45.1", features = ["full"] }
-vercel_runtime = "1.1.6"
-
-[[bin]]
-name = "superdev-fellowship-message-sign"
-path = "api/message/sign.rs"
-
-[[bin]]
-name = "superdev-fellowship-message-verify"
-path = "api/message/verify.rs"
-
-[[bin]]
-name = "superdev-fellowship-send-sol"
-path = "api/send/sol.rs"
-
-[[bin]]
-name = "superdev-fellowship-send-token"
-path = "api/send/token.rs"
-
-[[bin]]
-name = "superdev-fellowship-token-create"
-path = "api/token/create.rs"
-
-[[bin]]
-name = "superdev-fellowship-token-mint"
-path = "api/token/mint.rs"
-
-[[bin]]
-name = "superdev-fellowship-keypair"
-path = "api/keypair.rs"
+axum = "0.7"
+tokio = { version = "1.0", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tower-http = { version = "0.5", features = ["cors"] }
+solana-sdk = "1.17"
+solana-program = "1.17"
+spl-token = "4.0"
+spl-associated-token-account = "2.2"
+bs58 = "0.5"
+base64 = "0.21"
+anyhow = "1.0"
+tracing = "0.1"
+tracing-subscriber = "0.3"
+ed25519-dalek = "1.0"
+bincode = "1.3"

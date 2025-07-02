@@ -1,4 +1,9 @@
-/target
+# Node.js dependencies
+node_modules/
+
+# Rust build artifacts
+target/
+
+# OS and editor files
 .DS_Store
-.vercel
-node_modules
+*.swp 
