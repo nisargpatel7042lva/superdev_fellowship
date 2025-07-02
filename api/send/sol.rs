@@ -1,4 +1,4 @@
-use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
+use base58::ToBase58;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use solana_sdk::pubkey::Pubkey;
@@ -95,10 +95,9 @@ async fn send_sol(payload: SendSolRequest) -> Result<SendSolResponse, String> {
         return Err("Amount must be greater than 0".to_string());
     }
 
-    let from_pubkey =
-        parse_pubkey(&payload.from).map_err(|e| format!("Invalid from address: {}", e))?;
+    let from_pubkey = parse_pubkey(&payload.from).map_err(|_| "Invalid sender public key".to_string())?;
 
-    let to_pubkey = parse_pubkey(&payload.to).map_err(|e| format!("Invalid to address: {}", e))?;
+    let to_pubkey = parse_pubkey(&payload.to).map_err(|_| "Invalid recipient public key".to_string())?;
 
     // Create transfer instruction
     let instruction = system_instruction::transfer(&from_pubkey, &to_pubkey, payload.lamports);
@@ -108,7 +107,7 @@ async fn send_sol(payload: SendSolRequest) -> Result<SendSolResponse, String> {
     let response = SendSolResponse {
         program_id: instruction.program_id.to_string(),
         accounts,
-        instruction_data: BASE64.encode(&instruction.data),
+        instruction_data: instruction.data.to_base58(),
     };
 
     Ok(response)

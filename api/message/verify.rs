@@ -1,4 +1,4 @@
-use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
+use base58::FromBase58;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use solana_sdk::pubkey::Pubkey;
@@ -93,9 +93,9 @@ async fn verify_message(request: VerifyRequest) -> Result<VerifyResponse, String
     // Parse the public key
     let pubkey = Pubkey::from_str(&request.pubkey).map_err(|_| "Invalid public key format")?;
 
-    // Decode the base64 signature
-    let signature_bytes = BASE64
-        .decode(&request.signature)
+    // Decode the base58 signature
+    let signature_bytes = request.signature
+        .from_base58()
         .map_err(|_| "Invalid signature format")?;
 
     if signature_bytes.len() != 64 {

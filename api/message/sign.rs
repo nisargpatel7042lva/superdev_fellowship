@@ -1,7 +1,6 @@
-use base58::FromBase58;
-use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
+use base58::{FromBase58, ToBase58};
 use serde::{Deserialize, Serialize};
-use serde_json::json;
+use serde_json::{json, Value};
 use solana_sdk::signer::Signer;
 use solana_sdk::signer::keypair::Keypair;
 use vercel_runtime::{Body, Error, Request, Response, StatusCode, run};
@@ -9,13 +8,13 @@ use vercel_runtime::{Body, Error, Request, Response, StatusCode, run};
 #[derive(Deserialize)]
 struct SignRequest {
     message: String,
-    secret: String,
+    secret: Value,
 }
 
 #[derive(Serialize)]
 struct SignResponse {
     signature: String,
-    public_key: String,
+    pubkey: String,
     message: String,
 }
 
@@ -89,11 +88,34 @@ pub async fn handler(req: Request) -> Result<Response<Body>, Error> {
 }
 
 async fn sign_message(request: SignRequest) -> Result<SignResponse, String> {
-    // Decode the base58 secret key
-    let secret_bytes = request
-        .secret
-        .from_base58()
-        .map_err(|_| "Invalid secret key format")?;
+    // Handle both string and array formats for secret key
+    let secret_bytes = match &request.secret {
+        Value::String(s) => {
+            // If it's a string, try to decode as base58
+            s.from_base58().map_err(|_| "Invalid secret key format")?
+        }
+        Value::Array(arr) => {
+            // If it's an array, convert each element to u8
+            let mut bytes = Vec::new();
+            for val in arr {
+                if let Value::Number(n) = val {
+                    if let Some(byte) = n.as_u64() {
+                        if byte <= 255 {
+                            bytes.push(byte as u8);
+                        } else {
+                            return Err("Invalid byte value in secret key".to_string());
+                        }
+                    } else {
+                        return Err("Invalid number in secret key".to_string());
+                    }
+                } else {
+                    return Err("Invalid secret key format".to_string());
+                }
+            }
+            bytes
+        }
+        _ => return Err("Invalid secret key format".to_string()),
+    };
 
     if secret_bytes.len() != 64 {
         return Err("Invalid secret key length".to_string());
@@ -112,8 +134,8 @@ async fn sign_message(request: SignRequest) -> Result<SignResponse, String> {
     let signature = keypair.sign_message(message_bytes);
 
     let response = SignResponse {
-        signature: BASE64.encode(signature.as_ref()),
-        public_key: keypair.pubkey().to_string(),
+        signature: signature.as_ref().to_base58(),
+        pubkey: keypair.pubkey().to_string(),
         message: request.message,
     };
 

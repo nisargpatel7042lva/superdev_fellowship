@@ -4,7 +4,7 @@ import nacl from "tweetnacl";
 import bs58 from "bs58";
 import { getAssociatedTokenAddress } from "@solana/spl-token";
 
-const HTTP_URL = "https://superdev-fellowship.vercel.app/api";
+const HTTP_URL = "http://localhost:3000/api";
 
 const SUCCESS_CODE = 200;
 

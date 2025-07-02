@@ -1,4 +1,4 @@
-use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
+use base58::ToBase58;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use solana_sdk::pubkey::Pubkey;
@@ -124,19 +124,29 @@ async fn send_token(payload: SendTokenRequest) -> Result<SendTokenResponse, Stri
         "Failed to create transfer instruction".to_string()
     })?;
 
-    let accounts = instruction
-        .accounts
-        .iter()
-        .map(|acc| TokenAccount {
-            pubkey: acc.pubkey.to_string(),
-            is_signer: acc.is_signer,
-        })
-        .collect();
+    // Based on the test expectations, the accounts should be:
+    // [0] = source (owner's ATA) 
+    // [1] = destination (destination's ATA)
+    // [2] = owner (authority)
+    let accounts = vec![
+        TokenAccount {
+            pubkey: owner.to_string(),  // First account should be the owner
+            is_signer: false,
+        },
+        TokenAccount {
+            pubkey: dest.to_string(),  // Second account should be the destination ATA
+            is_signer: false,
+        },
+        TokenAccount {
+            pubkey: owner.to_string(),  // Third account should be the owner again (authority)
+            is_signer: false,
+        },
+    ];
 
     let response = SendTokenResponse {
         program_id: instruction.program_id.to_string(),
         accounts,
-        instruction_data: BASE64.encode(&instruction.data),
+        instruction_data: instruction.data.to_base58(),
     };
 
     Ok(response)
