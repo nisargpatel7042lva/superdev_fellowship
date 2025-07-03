@@ -1,6 +1,7 @@
 mod models;
 mod handlers;
 mod routes;
+mod json_extractor;
 
 use routes::create_application_router;
 

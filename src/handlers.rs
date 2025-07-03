@@ -1,0 +1,504 @@
+use axum::{Json, http::StatusCode};
+use solana_sdk::{pubkey::Pubkey, instruction::{AccountMeta, Instruction}, signature::{Keypair, Signer}};
+use spl_token::instruction::initialize_mint;
+use bs58;
+use crate::models::{ApiResponse, KeypairResponse, CreateTokenRequest, TokenInstructionResponse, AccountMetaResponse};
+use std::str::FromStr;
+use axum::extract::Json as AxumJson;
+use serde::Deserialize;
+use crate::json_extractor::CustomJson;
+use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
+use axum::response::IntoResponse;
+
+pub async fn create_new_keypair() -> impl IntoResponse {
+    let keypair = Keypair::new();
+    let pubkey = keypair.pubkey().to_string();
+    let secret = bs58::encode(keypair.to_bytes()).into_string();
+    let response = ApiResponse {
+        success: true,
+        data: Some(KeypairResponse { pubkey, secret }),
+        error: None,
+    };
+    (StatusCode::OK, Json(response))
+}
+
+pub async fn create_token_mint_instruction(
+    CustomJson(payload): CustomJson<CreateTokenRequest>,
+) -> impl IntoResponse {
+    // Validate public keys
+    let mint_pubkey = match Pubkey::from_str(&payload.mint) {
+        Ok(pk) => pk,
+        Err(_) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(ApiResponse {
+                    success: false,
+                    data: None,
+                    error: Some("Invalid mint public key".to_string()),
+                }),
+            )
+        }
+    };
+    let mint_authority = match Pubkey::from_str(&payload.mint_authority) {
+        Ok(pk) => pk,
+        Err(_) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(ApiResponse {
+                    success: false,
+                    data: None,
+                    error: Some("Invalid mint authority public key".to_string()),
+                }),
+            )
+        }
+    };
+    // Build instruction
+    let ix = match initialize_mint(
+        &spl_token::ID,
+        &mint_pubkey,
+        &mint_authority,
+        None,
+        payload.decimals,
+    ) {
+        Ok(ix) => ix,
+        Err(e) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(ApiResponse {
+                    success: false,
+                    data: None,
+                    error: Some(format!("Failed to create instruction: {}", e)),
+                }),
+            )
+        }
+    };
+    let accounts: Vec<AccountMetaResponse> = ix.accounts.iter().map(|meta| AccountMetaResponse {
+        pubkey: meta.pubkey.to_string(),
+        is_signer: meta.is_signer,
+        is_writable: meta.is_writable,
+    }).collect();
+    let response = TokenInstructionResponse {
+        program_id: ix.program_id.to_string(),
+        accounts,
+        instruction_data: bs58::encode(ix.data).into_string(),
+    };
+    (
+        StatusCode::OK,
+        Json(ApiResponse {
+            success: true,
+            data: Some(response),
+            error: None,
+        })
+    )
+}
+
+#[derive(Deserialize)]
+pub struct TokenAccountRequest {
+    pub wallet: String,
+    pub mint: String,
+}
+
+pub async fn get_associated_token_account(
+    CustomJson(payload): CustomJson<TokenAccountRequest>,
+) -> impl IntoResponse {
+    let wallet_pubkey = match Pubkey::from_str(&payload.wallet) {
+        Ok(pk) => pk,
+        Err(_) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(ApiResponse {
+                    success: false,
+                    data: None,
+                    error: Some("Invalid wallet public key".to_string()),
+                }),
+            )
+        }
+    };
+    let mint_pubkey = match Pubkey::from_str(&payload.mint) {
+        Ok(pk) => pk,
+        Err(_) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(ApiResponse {
+                    success: false,
+                    data: None,
+                    error: Some("Invalid mint public key".to_string()),
+                }),
+            )
+        }
+    };
+    let ata = spl_associated_token_account::get_associated_token_address(&wallet_pubkey, &mint_pubkey);
+    let data = serde_json::json!({ "ata": ata.to_string() });
+    (
+        StatusCode::OK,
+        Json(ApiResponse {
+            success: true,
+            data: Some(data),
+            error: None,
+        })
+    )
+}
+
+#[derive(Deserialize)]
+pub struct MintTokenRequest {
+    pub mint: String,
+    pub destination: String,
+    pub authority: String,
+    pub amount: u64,
+}
+
+pub async fn mint_token_instruction(
+    CustomJson(payload): CustomJson<MintTokenRequest>,
+) -> impl IntoResponse {
+    let mint_pubkey = match Pubkey::from_str(&payload.mint) {
+        Ok(pk) => pk,
+        Err(_) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(ApiResponse {
+                    success: false,
+                    data: None,
+                    error: Some("Invalid mint public key".to_string()),
+                }),
+            )
+        }
+    };
+    let destination_pubkey = match Pubkey::from_str(&payload.destination) {
+        Ok(pk) => pk,
+        Err(_) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(ApiResponse {
+                    success: false,
+                    data: None,
+                    error: Some("Invalid destination public key".to_string()),
+                }),
+            )
+        }
+    };
+    let authority_pubkey = match Pubkey::from_str(&payload.authority) {
+        Ok(pk) => pk,
+        Err(_) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(ApiResponse {
+                    success: false,
+                    data: None,
+                    error: Some("Invalid authority public key".to_string()),
+                }),
+            )
+        }
+    };
+    let ix = match spl_token::instruction::mint_to(
+        &spl_token::ID,
+        &mint_pubkey,
+        &destination_pubkey,
+        &authority_pubkey,
+        &[],
+        payload.amount,
+    ) {
+        Ok(ix) => ix,
+        Err(e) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(ApiResponse {
+                    success: false,
+                    data: None,
+                    error: Some(format!("Failed to create instruction: {}", e)),
+                }),
+            )
+        }
+    };
+    let accounts: Vec<AccountMetaResponse> = ix.accounts.iter().map(|meta| AccountMetaResponse {
+        pubkey: meta.pubkey.to_string(),
+        is_signer: meta.is_signer,
+        is_writable: meta.is_writable,
+    }).collect();
+    let ata = spl_associated_token_account::get_associated_token_address(&destination_pubkey, &mint_pubkey);
+    let response = TokenInstructionResponse {
+        program_id: ix.program_id.to_string(),
+        accounts,
+        instruction_data: BASE64.encode(&ix.data),
+    };
+    (
+        StatusCode::OK,
+        Json(ApiResponse {
+            success: true,
+            data: Some(response),
+            error: None,
+        })
+    )
+}
+
+#[derive(Deserialize)]
+pub struct SendSolRequest {
+    pub from: String,
+    pub to: String,
+    pub lamports: u64,
+}
+
+pub async fn send_sol_instruction(
+    CustomJson(payload): CustomJson<SendSolRequest>,
+) -> impl IntoResponse {
+    if payload.lamports == 0 {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(ApiResponse {
+                success: false,
+                data: None,
+                error: Some("Amount must be greater than 0".to_string()),
+            }),
+        );
+    }
+    let from_pubkey = match Pubkey::from_str(&payload.from) {
+        Ok(pk) => pk,
+        Err(_) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(ApiResponse {
+                    success: false,
+                    data: None,
+                    error: Some("Invalid sender public key".to_string()),
+                }),
+            )
+        }
+    };
+    let to_pubkey = match Pubkey::from_str(&payload.to) {
+        Ok(pk) => pk,
+        Err(_) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(ApiResponse {
+                    success: false,
+                    data: None,
+                    error: Some("Invalid recipient public key".to_string()),
+                }),
+            )
+        }
+    };
+    let ix = solana_sdk::system_instruction::transfer(&from_pubkey, &to_pubkey, payload.lamports);
+    let accounts = vec![from_pubkey.to_string(), to_pubkey.to_string()];
+    let response = serde_json::json!({
+        "program_id": ix.program_id.to_string(),
+        "accounts": accounts,
+        "instruction_data": bs58::encode(ix.data).into_string(),
+    });
+    (
+        StatusCode::OK,
+        Json(ApiResponse {
+            success: true,
+            data: Some(response),
+            error: None,
+        })
+    )
+}
+
+#[derive(Deserialize)]
+pub struct SendTokenRequest {
+    pub destination: String,
+    pub mint: String,
+    pub owner: String,
+    pub amount: u64,
+}
+
+pub async fn send_token_v2_instruction(
+    CustomJson(payload): CustomJson<SendTokenRequest>,
+) -> impl IntoResponse {
+    let destination_pubkey = match Pubkey::from_str(&payload.destination) {
+        Ok(pk) => pk,
+        Err(_) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(ApiResponse {
+                    success: false,
+                    data: None,
+                    error: Some("Invalid destination public key".to_string()),
+                }),
+            )
+        }
+    };
+    let mint_pubkey = match Pubkey::from_str(&payload.mint) {
+        Ok(pk) => pk,
+        Err(_) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(ApiResponse {
+                    success: false,
+                    data: None,
+                    error: Some("Invalid mint public key".to_string()),
+                }),
+            )
+        }
+    };
+    let owner_pubkey = match Pubkey::from_str(&payload.owner) {
+        Ok(pk) => pk,
+        Err(_) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(ApiResponse {
+                    success: false,
+                    data: None,
+                    error: Some("Invalid owner public key".to_string()),
+                }),
+            )
+        }
+    };
+    let ix = match spl_token::instruction::transfer(
+        &spl_token::ID,
+        &owner_pubkey,
+        &destination_pubkey,
+        &owner_pubkey,
+        &[],
+        payload.amount,
+    ) {
+        Ok(ix) => ix,
+        Err(e) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(ApiResponse {
+                    success: false,
+                    data: None,
+                    error: Some(format!("Failed to create instruction: {}", e)),
+                }),
+            )
+        }
+    };
+    let accounts: Vec<AccountMetaResponse> = ix.accounts.iter().map(|meta| AccountMetaResponse {
+        pubkey: meta.pubkey.to_string(),
+        is_signer: meta.is_signer,
+        is_writable: meta.is_writable,
+    }).collect();
+    let response = TokenInstructionResponse {
+        program_id: ix.program_id.to_string(),
+        accounts,
+        instruction_data: BASE64.encode(&ix.data),
+    };
+    (
+        StatusCode::OK,
+        Json(ApiResponse {
+            success: true,
+            data: Some(response),
+            error: None,
+        })
+    )
+}
+
+#[derive(Deserialize)]
+pub struct MessageSignRequest {
+    pub message: String,
+    pub secret: String,
+}
+
+pub async fn message_sign(
+    CustomJson(payload): CustomJson<MessageSignRequest>,
+) -> impl IntoResponse {
+    let secret_bytes = match bs58::decode(&payload.secret).into_vec() {
+        Ok(bytes) if bytes.len() == 64 => bytes,
+        _ => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(ApiResponse {
+                    success: false,
+                    data: None,
+                    error: Some("Invalid secret key format".to_string()),
+                }),
+            )
+        }
+    };
+    let keypair = match Keypair::from_bytes(&secret_bytes) {
+        Ok(kp) => kp,
+        Err(_) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(ApiResponse {
+                    success: false,
+                    data: None,
+                    error: Some("Invalid secret key".to_string()),
+                }),
+            )
+        }
+    };
+    let message_bytes = payload.message.as_bytes();
+    let signature = keypair.sign_message(message_bytes);
+    let response = serde_json::json!({
+        "signature": bs58::encode(signature).into_string(),
+        "message": payload.message,
+        "pubkey": keypair.pubkey().to_string(),
+    });
+    (
+        StatusCode::OK,
+        Json(ApiResponse {
+            success: true,
+            data: Some(response),
+            error: None,
+        })
+    )
+}
+
+#[derive(Deserialize)]
+pub struct MessageVerifyRequest {
+    pub message: String,
+    pub signature: String,
+    pub pubkey: String,
+}
+
+pub async fn message_verify(
+    CustomJson(payload): CustomJson<MessageVerifyRequest>,
+) -> impl IntoResponse {
+    let pubkey_bytes = match bs58::decode(&payload.pubkey).into_vec() {
+        Ok(bytes) if bytes.len() == 32 => bytes,
+        _ => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(ApiResponse {
+                    success: false,
+                    data: None,
+                    error: Some("Invalid public key format".to_string()),
+                }),
+            )
+        }
+    };
+    let signature_bytes = match bs58::decode(&payload.signature).into_vec() {
+        Ok(bytes) if bytes.len() == 64 => bytes,
+        _ => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(ApiResponse {
+                    success: false,
+                    data: None,
+                    error: Some("Invalid signature format".to_string()),
+                }),
+            )
+        }
+    };
+    let message_bytes = payload.message.as_bytes();
+    let valid = ed25519_dalek::Verifier::verify(
+        &ed25519_dalek::PublicKey::from_bytes(&pubkey_bytes).unwrap(),
+        message_bytes,
+        &ed25519_dalek::Signature::from_bytes(&signature_bytes).unwrap(),
+    ).is_ok();
+    let response = serde_json::json!({
+        "valid": valid,
+        "message": payload.message,
+        "pubkey": payload.pubkey,
+    });
+    (
+        StatusCode::OK,
+        Json(ApiResponse {
+            success: true,
+            data: Some(response),
+            error: None,
+        })
+    )
+}
+
+pub async fn health_check() -> impl IntoResponse {
+    (
+        StatusCode::OK,
+        Json(ApiResponse {
+            success: true,
+            data: Some(serde_json::json!({"status": "ok"})),
+            error: None,
+        })
+    )
+}
