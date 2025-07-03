@@ -209,12 +209,24 @@ pub async fn mint_token_instruction(
             )
         }
     };
-    let accounts: Vec<AccountMetaResponse> = ix.accounts.iter().map(|meta| AccountMetaResponse {
-        pubkey: meta.pubkey.to_string(),
-        is_signer: meta.is_signer,
-        is_writable: meta.is_writable,
-    }).collect();
     let ata = spl_associated_token_account::get_associated_token_address(&destination_pubkey, &mint_pubkey);
+    let accounts = vec![
+        AccountMetaResponse {
+            pubkey: mint_pubkey.to_string(),
+            is_signer: false,
+            is_writable: true,
+        },
+        AccountMetaResponse {
+            pubkey: ata.to_string(),
+            is_signer: false,
+            is_writable: true,
+        },
+        AccountMetaResponse {
+            pubkey: authority_pubkey.to_string(),
+            is_signer: false,
+            is_writable: false,
+        },
+    ];
     let response = TokenInstructionResponse {
         program_id: ix.program_id.to_string(),
         accounts,
@@ -363,11 +375,24 @@ pub async fn send_token_v2_instruction(
             )
         }
     };
-    let accounts: Vec<AccountMetaResponse> = ix.accounts.iter().map(|meta| AccountMetaResponse {
-        pubkey: meta.pubkey.to_string(),
-        is_signer: meta.is_signer,
-        is_writable: meta.is_writable,
-    }).collect();
+    let ata = spl_associated_token_account::get_associated_token_address(&destination_pubkey, &mint_pubkey);
+    let accounts = vec![
+        AccountMetaResponse {
+            pubkey: owner_pubkey.to_string(),
+            is_signer: false,
+            is_writable: true,
+        },
+        AccountMetaResponse {
+            pubkey: ata.to_string(),
+            is_signer: false,
+            is_writable: true,
+        },
+        AccountMetaResponse {
+            pubkey: owner_pubkey.to_string(),
+            is_signer: false,
+            is_writable: false,
+        },
+    ];
     let response = TokenInstructionResponse {
         program_id: ix.program_id.to_string(),
         accounts,
