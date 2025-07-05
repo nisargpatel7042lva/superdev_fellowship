@@ -277,7 +277,7 @@ pub async fn send_sol_instruction(
             }),
         );
     }
-    
+
     let from_pubkey = match Pubkey::from_str(&payload.from) {
         Ok(pk) => pk,
         Err(_) => {
@@ -288,10 +288,10 @@ pub async fn send_sol_instruction(
                     data: None,
                     error: Some("Invalid sender public key".to_string()),
                 }),
-            )
+            );
         }
     };
-    
+
     let to_pubkey = match Pubkey::from_str(&payload.to) {
         Ok(pk) => pk,
         Err(_) => {
@@ -302,37 +302,35 @@ pub async fn send_sol_instruction(
                     data: None,
                     error: Some("Invalid recipient public key".to_string()),
                 }),
-            )
+            );
         }
     };
-    
+
     let ix = solana_sdk::system_instruction::transfer(&from_pubkey, &to_pubkey, payload.lamports);
-    
-    let accounts: Vec<AccountMetaResponse> = ix.accounts.iter().map(|meta| AccountMetaResponse {
-        pubkey: meta.pubkey.to_string(),
-        is_signer: meta.is_signer,
-        is_writable: meta.is_writable,
-    }).collect();
-    
-    let response = TokenInstructionResponse {
-        program_id: ix.program_id.to_string(),
-        accounts,
-        instruction_data: bs58::encode(ix.data).into_string(),
-    };
-    
+
+    // Return only pubkey strings for accounts
+    let accounts: Vec<String> = ix.accounts.iter().map(|meta| meta.pubkey.to_string()).collect();
+
+    let response = serde_json::json!({
+        "program_id": ix.program_id.to_string(),
+        "accounts": accounts,
+        "instruction_data": bs58::encode(ix.data).into_string(),
+    });
+
     (
         StatusCode::OK,
         Json(ApiResponse {
             success: true,
             data: Some(response),
             error: None,
-        })
+        }),
     )
 }
 
 #[derive(Deserialize)]
 pub struct SendTokenRequest {
-    pub from: String,
+    #[serde(default)]
+    pub from: Option<String>,
     pub destination: String,
     pub mint: String,
     pub owner: String,
@@ -352,8 +350,11 @@ pub async fn send_token_v2_instruction(
             }),
         );
     }
-    
-    let from_pubkey = match Pubkey::from_str(&payload.from) {
+
+    // Use owner as from if from is not provided
+    let from_str = payload.from.as_ref().unwrap_or(&payload.owner);
+
+    let from_pubkey = match Pubkey::from_str(from_str) {
         Ok(pk) => pk,
         Err(_) => {
             return (
@@ -363,10 +364,10 @@ pub async fn send_token_v2_instruction(
                     data: None,
                     error: Some("Invalid from public key".to_string()),
                 }),
-            )
+            );
         }
     };
-    
+
     let destination_pubkey = match Pubkey::from_str(&payload.destination) {
         Ok(pk) => pk,
         Err(_) => {
@@ -377,10 +378,10 @@ pub async fn send_token_v2_instruction(
                     data: None,
                     error: Some("Invalid destination public key".to_string()),
                 }),
-            )
+            );
         }
     };
-    
+
     let mint_pubkey = match Pubkey::from_str(&payload.mint) {
         Ok(pk) => pk,
         Err(_) => {
@@ -391,10 +392,10 @@ pub async fn send_token_v2_instruction(
                     data: None,
                     error: Some("Invalid mint public key".to_string()),
                 }),
-            )
+            );
         }
     };
-    
+
     let owner_pubkey = match Pubkey::from_str(&payload.owner) {
         Ok(pk) => pk,
         Err(_) => {
@@ -405,13 +406,13 @@ pub async fn send_token_v2_instruction(
                     data: None,
                     error: Some("Invalid owner public key".to_string()),
                 }),
-            )
+            );
         }
     };
-    
+
     let from_ata = spl_associated_token_account::get_associated_token_address(&from_pubkey, &mint_pubkey);
     let destination_ata = spl_associated_token_account::get_associated_token_address(&destination_pubkey, &mint_pubkey);
-    
+
     let ix = match spl_token::instruction::transfer(
         &spl_token::ID,
         &from_ata,
@@ -429,29 +430,26 @@ pub async fn send_token_v2_instruction(
                     data: None,
                     error: Some(format!("Failed to create instruction: {}", e)),
                 }),
-            )
+            );
         }
     };
-    
-    let accounts: Vec<AccountMetaResponse> = ix.accounts.iter().map(|meta| AccountMetaResponse {
-        pubkey: meta.pubkey.to_string(),
-        is_signer: meta.is_signer,
-        is_writable: meta.is_writable,
-    }).collect();
-    
-    let response = TokenInstructionResponse {
-        program_id: ix.program_id.to_string(),
-        accounts,
-        instruction_data: bs58::encode(ix.data).into_string(),
-    };
-    
+
+    // Return only pubkey strings for accounts
+    let accounts: Vec<String> = ix.accounts.iter().map(|meta| meta.pubkey.to_string()).collect();
+
+    let response = serde_json::json!({
+        "program_id": ix.program_id.to_string(),
+        "accounts": accounts,
+        "instruction_data": bs58::encode(ix.data).into_string(),
+    });
+
     (
         StatusCode::OK,
         Json(ApiResponse {
             success: true,
             data: Some(response),
             error: None,
-        })
+        }),
     )
 }
 
