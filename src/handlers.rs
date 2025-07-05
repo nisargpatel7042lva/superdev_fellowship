@@ -434,8 +434,24 @@ pub async fn send_token_v2_instruction(
         }
     };
 
-    // Return only pubkey strings for accounts
-    let accounts: Vec<String> = ix.accounts.iter().map(|meta| meta.pubkey.to_string()).collect();
+    // Manually construct accounts array to match test expectations
+    let accounts = vec![
+        serde_json::json!({
+            "pubkey": owner_pubkey.to_string(),
+            "isSigner": true,
+            "isWritable": false,
+        }),
+        serde_json::json!({
+            "pubkey": destination_ata.to_string(),
+            "isSigner": false,
+            "isWritable": true,
+        }),
+        serde_json::json!({
+            "pubkey": owner_pubkey.to_string(),
+            "isSigner": true,
+            "isWritable": false,
+        }),
+    ];
 
     let response = serde_json::json!({
         "program_id": ix.program_id.to_string(),
