@@ -12,13 +12,7 @@ A Rust-based HTTP server that provides Solana blockchain operations including ke
 - CORS enabled for web applications
 
 ## Project Structure
-
-The project is organized into modular components:
-
-- `src/main.rs` - Application entry point and server startup
-- `src/models.rs` - Data structures and request/response types
-- `src/handlers.rs` - HTTP endpoint handlers with business logic
-- `src/routes.rs` - Route definitions and application router setup
+src/main.rs – Currently contains the application entry point, server startup, and all other logic that should be moved into separate modules.
 
 ## Quick Start
 
